@@ -1,2 +1,5 @@
 nbactions.xml
 release.sh
+/target/
+/.idea/
+/wad.iml

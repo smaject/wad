@@ -5,21 +5,21 @@ import com.airhacks.wad.control.Builder;
 import com.airhacks.wad.control.Copier;
 import com.airhacks.wad.control.FolderWatchService;
 import com.airhacks.wad.control.TerminalColors;
+import org.apache.maven.shared.invoker.InvocationResult;
+import org.apache.maven.shared.invoker.MavenInvocationException;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
-import static java.time.temporal.ChronoField.HOUR_OF_DAY;
-import static java.time.temporal.ChronoField.MINUTE_OF_HOUR;
-import static java.time.temporal.ChronoField.SECOND_OF_MINUTE;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.LongSummaryStatistics;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.maven.shared.invoker.InvocationResult;
-import org.apache.maven.shared.invoker.MavenInvocationException;
+
+import static java.time.temporal.ChronoField.*;
 
 /**
  *
@@ -32,42 +32,64 @@ public class WADFlow {
     private final AtomicLong buildErrorCounter = new AtomicLong();
 
     private final Copier copier;
-    private final Builder builder;
+    private final Runnable mainListener;
 
-    public WADFlow(Path dir, Path war, List<Path> deploymentTargets) throws IOException {
-        this.builder = new Builder();
+    public WADFlow(Path mainDir, List<Path> deptDirs, Path war, List<Path> deploymentTargets) throws IOException {
         this.buildTimes = new ArrayList<>();
         this.copier = new Copier(war, deploymentTargets);
-        Runnable changeListener = this::buildAndDeploy;
+
+        final Builder builder = new Builder(mainDir);
+        this.mainListener = () -> this.buildAndDeploy(builder);
+
+        for (Path dir : deptDirs) {
+            registerDeptWatchListener(dir);
+        }
+
+        this.mainListener.run();
+        registerEnterListener(this.mainListener);
+        FolderWatchService.listenForChanges(mainDir, this.mainListener, true);
+    }
+
+    void registerDeptWatchListener(Path sourceDir) throws IOException {
+        final Builder builder = new Builder(sourceDir);
+        Runnable changeListener = () -> this.buildAndNotify(builder);
         changeListener.run();
-        registerEnterListener(changeListener);
-        FolderWatchService.listenForChanges(dir, changeListener);
+        FolderWatchService.listenForChanges(sourceDir, changeListener, false);
     }
 
     void registerEnterListener(Runnable listener) {
         InputStream in = System.in;
         Runnable task = () -> {
             int c;
-        try {
-            while ((c = in.read()) != -1) {
-                listener.run();
-            }
+            try {
+                while ((c = in.read()) != -1) {
+                    listener.run();
+                }
             } catch (IOException ex) {
             }
         };
         new Thread(task).start();
     }
 
-    void buildAndDeploy() {
-        this.build();
+    void buildAndNotify(Builder builder) {
+        boolean isInitialBuild = builder.isInitialBuild();
+        this.build(builder);
+        if (!isInitialBuild) {
+            this.mainListener.run();
+        }
+    }
+
+    void buildAndDeploy(Builder builder) {
+        this.build(builder);
         this.deploy();
     }
 
-    void build() {
+    void build(Builder builder) {
         long start = System.currentTimeMillis();
         try {
-            System.out.printf("[%s%s%s]", TerminalColors.TIME.value(), currentFormattedTime(), TerminalColors.RESET.value());
-            InvocationResult result = this.builder.build();
+            System.out.printf("[%s%s%s]", TerminalColors.TIME.value(), currentFormattedTime(),
+                    TerminalColors.RESET.value());
+            InvocationResult result = builder.build();
             if (result.getExitCode() == 0) {
                 System.out.printf("[%d]", successCounter.incrementAndGet());
                 System.out.print("\uD83D\uDC4D");

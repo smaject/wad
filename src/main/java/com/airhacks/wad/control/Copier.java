@@ -42,11 +42,14 @@ public class Copier {
     }
 
     Path copySingle(Path from, Path to) {
+        if (!Files.exists(from)) return null;
+
         long kb;
         try {
             kb = Files.size(from) / 1024;
             warSizes.add(kb);
-            System.out.printf("Copying %dkB ThinWAR to %s %s %s \n", kb, TerminalColors.FILE.value(), shortenForDisplay(to, 40), TerminalColors.RESET.value());
+            System.out.printf("Copying %dkB ThinWAR to %s %s %s \n", kb, TerminalColors.FILE.value(),
+                    shortenForDisplay(to, 40), TerminalColors.RESET.value());
             return Files.copy(from, to, StandardCopyOption.REPLACE_EXISTING);
 
         } catch (IOException ex) {

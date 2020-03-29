@@ -2,13 +2,15 @@
  */
 package com.airhacks.wad.control;
 
+import org.junit.Test;
+
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+
 import static org.junit.Assert.assertTrue;
-import org.junit.Test;
 
 /**
  *
@@ -19,7 +21,7 @@ public class ConfiguratorTest {
     @Test
     public void readExistingConfiguration() {
         Path wadrc = Paths.get("src/test/resources", "wadrc");
-        Set<Path> lines = Configurator.getConfigurationFromDirectory(wadrc);
+        Set<Path> lines = Configurator.getPathConfigurationFromDirectory(wadrc, Configurator.WAD_KEY_DEPLOYMENT_DIR);
         List<String> folderLines = lines.
                 stream().
                 map(l -> l.toString()).
@@ -32,7 +34,7 @@ public class ConfiguratorTest {
     @Test
     public void readNonExistingConfiguration() {
         Path wadrc = Paths.get("src/test/resources", "doesNotExist");
-        Set<Path> lines = Configurator.getConfigurationFromDirectory(wadrc);
+        Set<Path> lines = Configurator.getPathConfigurationFromDirectory(wadrc, Configurator.WAD_KEY_DEPLOYMENT_DIR);
         assertTrue(lines.isEmpty());
     }
 

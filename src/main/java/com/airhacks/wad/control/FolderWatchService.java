@@ -5,41 +5,43 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 /**
- *
  * @author airhacks.com
  */
 public interface FolderWatchService {
 
-    static long POLLING_INTERVALL = 500;
+    long POLLING_INTERVALL = 500;
 
-    static String POM = "pom.xml";
+    String POM = "pom.xml";
 
-    public static void listenForChanges(Path dir, Runnable listener) throws IOException {
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-        checkForChanges(scheduler, dir, listener);
+    static void listenForChanges(Path baseDir, Runnable listener, boolean isMainModule) throws IOException {
+        Path dir = Paths.get(baseDir.toString(), "src/main");
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(5);
+        System.out.println("Register listener for dir: " + dir);
+        if (!isMainModule) {
+            CompletableFuture.runAsync(() -> checkForChanges(scheduler, dir, listener));
+        } else {
+            checkForChanges(scheduler, dir, listener);
+        }
     }
 
     static void checkForChanges(ScheduledExecutorService scheduler, Path dir, Runnable changeListener) {
         long initialStamp = getProjectModificationId(dir);
-        boolean changeDetected = false;
+        long currentStamp;
         while (true) {
             try {
                 final long previous = initialStamp;
-                changeDetected = scheduler.
-                        schedule(() -> detectModification(dir, previous), POLLING_INTERVALL, TimeUnit.MILLISECONDS).
+                currentStamp = scheduler.
+                        schedule(() -> detectModification(dir), POLLING_INTERVALL, TimeUnit.MILLISECONDS).
                         get();
-        } catch (InterruptedException | ExecutionException ex) {
-            throw new IllegalStateException("Scheduler error", ex);
-        }
-        if (changeDetected) {
+            } catch (InterruptedException | ExecutionException ex) {
+                throw new IllegalStateException("Scheduler error", ex);
+            }
+            if (initialStamp != currentStamp) {
                 changeListener.run();
-            initialStamp = getProjectModificationId(dir);
+                initialStamp = currentStamp;
             }
         }
     }
@@ -48,9 +50,8 @@ public interface FolderWatchService {
         return getFileSize(Paths.get(POM));
     }
 
-    static boolean detectModification(Path dir, long previousStamp) {
-        long currentStamp = getProjectModificationId(dir);
-        return previousStamp != currentStamp;
+    static long detectModification(Path dir) {
+        return getProjectModificationId(dir);
     }
 
     static long getProjectModificationId(Path dir) {

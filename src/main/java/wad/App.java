@@ -3,25 +3,23 @@ package wad;
 
 import com.airhacks.wad.boundary.WADFlow;
 import com.airhacks.wad.control.Configurator;
-import static com.airhacks.wad.control.PreBuildChecks.pomExists;
-import static com.airhacks.wad.control.PreBuildChecks.validateDeploymentDirectories;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.airhacks.wad.control.PreBuildChecks.pomExists;
+import static com.airhacks.wad.control.PreBuildChecks.validateDeploymentDirectories;
+
 /**
- *
  * @author airhacks.com
  */
 public class App {
-    
+
     static Path addTrailingSlash(String path) {
         if (!path.endsWith(File.separator)) {
             return Paths.get(path, File.separator);
@@ -55,24 +53,27 @@ public class App {
 
     public static void main(String[] args) throws IOException {
         printWelcomeMessage();
-        if (args.length < 1 && !Configurator.userConfigurationExists()) {
+        if (args.length < 1 && !Configurator.userConfigurationExists() && !Configurator.moduleConfigurationExists()) {
             System.out.println("Invoke with java -jar wad.jar [DEPLOYMENT_DIR1,DEPLOYMENT_DIR1] or create ~/.wadrc");
             System.exit(-1);
         }
         pomExists();
         Path currentPath = Paths.get("").toAbsolutePath();
-        Path currentDirectory = currentPath.getFileName();
-        String thinWARName = currentDirectory + ".war";
 
-        Path thinWARPath = Paths.get("target", thinWARName);
+        //check if there is a special war file name configured
+        String thinWARName = Configurator.getWarFileName();
+        Path thinWARPath = Paths.get("./target", thinWARName);
 
-        Set<Path> deploymentDirs = Configurator.getConfiguredFolders(convert(args));
+        Set<Path> deploymentDirs = Configurator.getConfiguredDeploymentFolders(convert(args));
         validateDeploymentDirectories(deploymentDirs);
 
         List<Path> deploymentTargets = addWarName(deploymentDirs, thinWARName);
-        Path sourceCodeDir = Paths.get("./src/main/");
-        System.out.printf("WAD is watching %s, deploying %s to %s \n", sourceCodeDir, thinWARPath, deploymentTargets);
-        WADFlow wadFlow = new WADFlow(sourceCodeDir, thinWARPath, deploymentTargets);
+
+        List<Path> sourceCodeDirs = new ArrayList<>();
+        sourceCodeDirs.addAll(Configurator.getDependentModules());
+        System.out.printf("WAD is watching %s, deploying %s to %s \n", sourceCodeDirs, thinWARPath, deploymentTargets);
+
+        new WADFlow(currentPath, sourceCodeDirs, thinWARPath, deploymentTargets);
     }
 
 }

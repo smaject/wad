@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.airhacks</groupId>
     <artifactId>wad</artifactId>
-    <version>0.1.1</version>
+    <version>0.2.1</version>
     <packaging>jar</packaging>
     <dependencies>
         <dependency>
@@ -71,6 +71,7 @@
         
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <java.release>1.8</java.release>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
     </properties>
